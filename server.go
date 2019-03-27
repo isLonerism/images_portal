@@ -1,13 +1,31 @@
 package main
 
 import (
-	"io/ioutil"
+	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	oc "github.com/bsuro10/images-portal/interfaces/openshift_client"
 )
 
-const maxUploadSize = 1 * 1024 * 1024 // 1 GB
-const uploadPath = "./tmp"
+// TODO: Pass to enviornment variables
+const (
+	maxUploadSize = 1 * 1024 * 1024 // 1 GB
+	s3_bucket     = "uploaded-images"
+)
+
+var (
+	s3_config = &aws.Config{
+		Credentials:      credentials.NewStaticCredentials("FZJ94C79V4MTQUVIESCC", "c6aF+ZELuUnd8CgL0wnFnSFoSXE2pjwNeTJyQIg0", ""),
+		Endpoint:         aws.String("http://localhost:9000"),
+		Region:           aws.String("default"),
+		S3ForcePathStyle: aws.Bool(true),
+	}
+)
 
 func main() {
 	http.HandleFunc("/upload", uploadFileHandler)
@@ -20,26 +38,40 @@ func main() {
 }
 
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	// TODO: why do we need MaxBytesReader and ParseMultipartForm both
-	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		renderError(w, "FILE_TOO_BIG", http.StatusBadRequest)
 		log.Println(err)
 		return
 	}
 
-	fileType := r.PostFormValue("type")
-	file, _, err := r.FormFile("uploadFile")
+	file, handler, err := r.FormFile("uploadFile")
 	if err != nil {
 		renderError(w, "INVALID_FILE", http.StatusBadRequest)
 		return
 	}
-	defer file.Close() // closing the file after the function is done
-	fileBytes, err := ioutil.ReadAll(file)
+
+	// TODO: Add fileType check (only .tar and .tar.gz)
+
+	// Upload the file to s3 object storage
+	sess := session.Must(session.NewSession(s3_config))
+	uploader := s3manager.NewUploader(sess)
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(s3_bucket),
+		Key:    aws.String(handler.Filename),
+		Body:   file,
+	})
+
 	if err != nil {
-		renderError(w, "INVALID_FILE", http.StatusBadRequest)
+		renderError(w, "UPLOAD_FAILED", http.StatusBadRequest)
+		log.Println(err)
 		return
 	}
+
+	defer file.Close()
+
+	oc.DeployPod()
+
+	fmt.Printf("File uploaded to: %s\n", aws.StringValue(&result.Location))
 }
 
 func renderError(w http.ResponseWriter, message string, statusCode int) {
