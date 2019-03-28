@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"mime/multipart"
@@ -15,7 +16,7 @@ import (
 
 // TODO: Pass to enviornment variables
 const (
-	maxUploadSize = 1 * 1024 * 1024 // 1 GB
+	maxUploadSize = 10 * 1024 * 1024 // 10 GB
 	s3_bucket     = "uploaded-images"
 )
 
@@ -39,49 +40,39 @@ func main() {
 }
 
 func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-		renderError(w, "FILE_TOO_BIG", http.StatusBadRequest)
-		log.Println(err)
-		return
+	switch r.Method {
+	case "POST":
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			renderError(w, "FILE_TOO_BIG/INVALID_FORM_DATA", http.StatusBadRequest)
+			log.Println(err)
+			return
+		}
+
+		file, handler, err := r.FormFile("uploadFile")
+		if err != nil {
+			renderError(w, "INVALID_FILE", http.StatusBadRequest)
+			return
+		}
+
+		if err := validateFile(&file); err != nil {
+			renderError(w, err.Error(), http.StatusBadRequest)
+			log.Println(err)
+			return
+		}
+
+		defer file.Close()
+
+		result, err := uploadToS3(&file, handler.Filename)
+		if err != nil {
+			renderError(w, "UPLOAD_FAILED", http.StatusBadRequest)
+			log.Println(err)
+			return
+		}
+
+		fmt.Printf("File uploaded to: %s\n", aws.StringValue(&result.Location))
+	default:
+		fmt.Fprintf(w, "Sorry, only POST methods are supported.")
 	}
-
-	file, handler, err := r.FormFile("uploadFile")
-	if err != nil {
-		renderError(w, "INVALID_FILE", http.StatusBadRequest)
-		return
-	}
-
-	fileHeader := make([]byte, 512)
-	if _, err := file.Read(fileHeader); err != nil {
-		renderError(w, "ERROR_READING_FILE_HEADER", http.StatusBadRequest)
-		log.Println(err)
-		return
-	}
-
-	filetype, err := filetype.Match(fileHeader)
-	if err != nil {
-		renderError(w, "SOMETHING_WENT_WRONG_WITH_YOUR_FILE_TYPE", http.StatusBadRequest)
-		log.Println(err)
-		return
-	}
-	if filetype.Extension != "tar" {
-		renderError(w, "NOT_SUPPORTED_FILE_TYPE", http.StatusBadRequest)
-		fmt.Println("File type is not supported: ", filetype.Extension)
-		return
-	}
-
-	fmt.Println(filetype.Extension)
-
-	defer file.Close()
-
-	result, err := uploadToS3(&file, handler.Filename)
-	if err != nil {
-		renderError(w, "UPLOAD_FAILED", http.StatusBadRequest)
-		log.Println(err)
-		return
-	}
-
-	fmt.Printf("File uploaded to: %s\n", aws.StringValue(&result.Location))
 }
 
 func renderError(w http.ResponseWriter, message string, statusCode int) {
@@ -101,8 +92,23 @@ func uploadToS3(file *multipart.File, filename string) (*s3manager.UploadOutput,
 	return result, err
 }
 
-func validateFile() {
+func validateFile(file *multipart.File) error {
+	fileHeader := make([]byte, 512)
+	if _, err := (*file).Read(fileHeader); err != nil {
+		return err
+	}
 
+	filetype, err := filetype.Match(fileHeader)
+	if err != nil {
+		return err
+	}
+	if filetype.Extension != "tar" {
+		return errors.New("File type is not supported: " + filetype.Extension)
+	}
+
+	// TODO: Validate filesize
+
+	return nil
 }
 
 func pushToOpenshift() {
