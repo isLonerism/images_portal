@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	oc "github.com/bsuro10/images-portal/interfaces/openshift_client"
+	"github.com/h2non/filetype"
 )
 
 // TODO: Pass to enviornment variables
@@ -50,26 +51,35 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Add fileType check (only .tar and .tar.gz)
+	fileHeader := make([]byte, 512)
+	if _, err := file.Read(fileHeader); err != nil {
+		renderError(w, "ERROR_READING_FILE_HEADER", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
 
-	// Upload the file to s3 object storage
-	sess := session.Must(session.NewSession(s3_config))
-	uploader := s3manager.NewUploader(sess)
-	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(s3_bucket),
-		Key:    aws.String(handler.Filename),
-		Body:   file,
-	})
+	filetype, err := filetype.Match(fileHeader)
+	if err != nil {
+		renderError(w, "SOMETHING_WENT_WRONG_WITH_YOUR_FILE_TYPE", http.StatusBadRequest)
+		log.Println(err)
+		return
+	}
+	if filetype.Extension != "tar" {
+		renderError(w, "NOT_SUPPORTED_FILE_TYPE", http.StatusBadRequest)
+		fmt.Println("File type is not supported: ", filetype.Extension)
+		return
+	}
 
+	fmt.Println(filetype.Extension)
+
+	defer file.Close()
+
+	result, err := uploadToS3(&file, handler.Filename)
 	if err != nil {
 		renderError(w, "UPLOAD_FAILED", http.StatusBadRequest)
 		log.Println(err)
 		return
 	}
-
-	defer file.Close()
-
-	oc.DeployPod()
 
 	fmt.Printf("File uploaded to: %s\n", aws.StringValue(&result.Location))
 }
@@ -77,4 +87,24 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 func renderError(w http.ResponseWriter, message string, statusCode int) {
 	w.WriteHeader(statusCode)
 	w.Write([]byte(message))
+}
+
+func uploadToS3(file *multipart.File, filename string) (*s3manager.UploadOutput, error) {
+	sess := session.Must(session.NewSession(s3_config))
+	uploader := s3manager.NewUploader(sess)
+	result, err := uploader.Upload(&s3manager.UploadInput{
+		Bucket: aws.String(s3_bucket),
+		Key:    aws.String(filename),
+		Body:   *file,
+	})
+
+	return result, err
+}
+
+func validateFile() {
+
+}
+
+func pushToOpenshift() {
+
 }
