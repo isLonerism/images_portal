@@ -22,7 +22,7 @@ const (
 
 var (
 	s3_config = &aws.Config{
-		Credentials:      credentials.NewStaticCredentials("FZJ94C79V4MTQUVIESCC", "c6aF+ZELuUnd8CgL0wnFnSFoSXE2pjwNeTJyQIg0", ""),
+		Credentials:      credentials.NewStaticCredentials("EUZWJJWSWHS3TWQ0MQKN", "OcJJ1NIEGozBx0yvmg3oXZrxE+3k2T2e2B3N3cHZ", ""),
 		Endpoint:         aws.String("http://localhost:9000"),
 		Region:           aws.String("default"),
 		S3ForcePathStyle: aws.Bool(true),

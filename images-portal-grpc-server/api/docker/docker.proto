@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package docker;
+
+message S3Object {
+    string s3_key = 1;
+}
+
+message Image {
+    string name = 1;
+}
+
+message ImagesList {
+    repeated Image images = 1;
+}
+
+message TagImage {
+    Image old_image = 1;
+    Image new_image = 2;
+}
+message TagImagesList {
+    repeated TagImage images = 1;
+}
+
+message TagAndPushObject {
+    TagImagesList tag_images = 1;
+    AuthConfig auth_config = 2;
+}
+
+message AuthConfig {
+    string username = 1;
+    string password = 2;
+}
+
+message Message {
+    string message = 1;
+}
+
+service Docker {
+    rpc Load(S3Object) returns (ImagesList) {}
+    rpc TagAndPush(TagAndPushObject) returns (Message) {}
+}
