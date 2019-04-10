@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/ioutil"
 	"log"
+	"os"
 	"regexp"
 	"strings"
 
@@ -117,13 +119,16 @@ func (s *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *
 			return nil, errors.New("Error occurred while encoding the auth config")
 		}
 
-		_, err = s.client.ImagePush(ctx, new_image, types.ImagePushOptions{
+		out, err := s.client.ImagePush(ctx, new_image, types.ImagePushOptions{
 			RegistryAuth: registryAuth,
 		})
 		if err != nil {
 			log.Println(err)
 			return nil, errors.New("Error occurred while pushing the image: " + new_image)
 		}
+		defer out.Close()
+
+		io.Copy(os.Stdout, out)
 	}
 
 	return &Message{
