@@ -1,116 +1,63 @@
 package main
 
 import (
-	"errors"
-	"fmt"
+	"context"
 	"log"
-	"mime/multipart"
-	"net/http"
+	"strconv"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	"github.com/h2non/filetype"
-)
-
-// TODO: Pass to enviornment variables
-const (
-	maxUploadSize = 10 * 1024 * 1024 // 10 GB
-	s3_bucket     = "uploaded-images"
-)
-
-var (
-	s3_config = &aws.Config{
-		Credentials:      credentials.NewStaticCredentials("EUZWJJWSWHS3TWQ0MQKN", "OcJJ1NIEGozBx0yvmg3oXZrxE+3k2T2e2B3N3cHZ", ""),
-		Endpoint:         aws.String("http://localhost:9000"),
-		Region:           aws.String("default"),
-		S3ForcePathStyle: aws.Bool(true),
-	}
+	"github.com/bsuro10/images-portal/images-portal-grpc-server/api/docker"
+	"google.golang.org/grpc"
 )
 
 func main() {
-	http.HandleFunc("/upload", uploadFileHandler)
+	// if err := http.ListenAndServe(":8080", nil); err != nil {
+	// 	panic(err)
+	// }
 
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	// log.Print("Server started on port 8080")
+
+	conn, err := grpc.Dial(":7777", grpc.WithInsecure())
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+
+	client := docker.NewDockerClient(conn)
+
+	response, err := client.Load(context.Background(), &docker.S3Object{
+		S3Key: "test-images.tar",
+	})
+	if err != nil {
 		panic(err)
 	}
 
-	log.Print("Server started on port 8080")
-}
+	log.Println(response)
 
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case "POST":
-		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
-			renderError(w, "FILE_TOO_BIG/INVALID_FORM_DATA", http.StatusBadRequest)
-			log.Println(err)
-			return
-		}
-
-		file, handler, err := r.FormFile("uploadFile")
-		if err != nil {
-			renderError(w, "INVALID_FILE", http.StatusBadRequest)
-			return
-		}
-
-		if err := validateFile(&file); err != nil {
-			renderError(w, err.Error(), http.StatusBadRequest)
-			log.Println(err)
-			return
-		}
-
-		defer file.Close()
-
-		result, err := uploadToS3(&file, handler.Filename)
-		if err != nil {
-			renderError(w, "UPLOAD_FAILED", http.StatusBadRequest)
-			log.Println(err)
-			return
-		}
-
-		fmt.Printf("File uploaded to: %s\n", aws.StringValue(&result.Location))
-	default:
-		fmt.Fprintf(w, "Sorry, only POST methods are supported.")
+	var list []*docker.TagImage
+	var counter int
+	counter = 0
+	for _, element := range response.GetImages() {
+		counter = counter + 1
+		list = append(list, &docker.TagImage{
+			OldImage: element,
+			NewImage: &docker.Image{
+				Name: "bsuro10/tagggggeedddrantest" + strconv.Itoa(counter),
+			},
+		})
 	}
-}
 
-func renderError(w http.ResponseWriter, message string, statusCode int) {
-	w.WriteHeader(statusCode)
-	w.Write([]byte(message))
-}
-
-func uploadToS3(file *multipart.File, filename string) (*s3manager.UploadOutput, error) {
-	sess := session.Must(session.NewSession(s3_config))
-	uploader := s3manager.NewUploader(sess)
-	result, err := uploader.Upload(&s3manager.UploadInput{
-		Bucket: aws.String(s3_bucket),
-		Key:    aws.String(filename),
-		Body:   *file,
+	message, err := client.TagAndPush(context.Background(), &docker.TagAndPushObject{
+		TagImages: &docker.TagImagesList{
+			Images: list,
+		},
+		AuthConfig: &docker.AuthConfig{
+			Username: "bsuro10",
+			Password: "maginsuro",
+		},
 	})
-
-	return result, err
-}
-
-func validateFile(file *multipart.File) error {
-	fileHeader := make([]byte, 512)
-	if _, err := (*file).Read(fileHeader); err != nil {
-		return err
-	}
-
-	filetype, err := filetype.Match(fileHeader)
 	if err != nil {
-		return err
-	}
-	if filetype.Extension != "tar" {
-		return errors.New("File type is not supported: " + filetype.Extension)
+		panic(err)
 	}
 
-	// TODO: Validate filesize
-
-	return nil
-}
-
-func pushToOpenshift() {
-
+	log.Println(message)
 }
