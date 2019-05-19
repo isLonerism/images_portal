@@ -4,6 +4,11 @@ package docker;
 
 message S3Object {
     string s3_key = 1;
+    string s3_bucket = 2;
+    string s3_accesskey = 3;
+    string s3_secretkey = 4;
+    string s3_endpoint = 5;
+    string s3_region = 6;
 }
 
 message Image {

@@ -22,19 +22,6 @@ import (
 	"github.com/docker/docker/client"
 )
 
-const (
-	s3_bucket = "uploaded-images"
-)
-
-var (
-	s3_config = &aws.Config{
-		Credentials:      credentials.NewStaticCredentials("Y09W8LPRNL3C282H0IAF", "DuQMZ1RgKf0Wwgv6ymWrmJadmm2gp8LnVvzDGef+", ""),
-		Endpoint:         aws.String("http://localhost:9000"),
-		Region:           aws.String("default"),
-		S3ForcePathStyle: aws.Bool(true),
-	}
-)
-
 type DockerServiceServer struct {
 	client *client.Client
 }
@@ -44,7 +31,12 @@ func RegisterDockerService(client *client.Client) *DockerServiceServer {
 }
 
 func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*ImagesList, error) {
-	buff, err := downloadS3file((*s3_object).GetS3Key(), s3_bucket, s3_config)
+	buff, err := downloadS3file((*s3_object).GetS3Key(), (*s3_object).GetS3Bucket(), &aws.Config{
+		Credentials:      credentials.NewStaticCredentials((*s3_object).GetS3Accesskey(), (*s3_object).GetS3Secretkey(), ""),
+		Endpoint:         aws.String((*s3_object).GetS3Endpoint()),
+		Region:           aws.String((*s3_object).GetS3Region()),
+		S3ForcePathStyle: aws.Bool(true),
+	})
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("Error occurred while downloading the image")
