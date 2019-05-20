@@ -8,4 +8,5 @@ FROM docker:dind
 USER root
 COPY --from=builder /build/server /app/
 WORKDIR /app
+EXPOSE 7777
 CMD ["./server"]
