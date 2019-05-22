@@ -1,63 +1,28 @@
 package main
 
 import (
-	"context"
 	"log"
-	"strconv"
+	"net/http"
 
-	"github.com/bsuro10/images-portal/images-portal-grpc-server/api/docker"
-	"google.golang.org/grpc"
+	oc "github.com/bsuro10/images-portal/images-portal-grpc-client/interfaces/openshift_client"
 )
 
 func main() {
-	// if err := http.ListenAndServe(":8080", nil); err != nil {
-	// 	panic(err)
-	// }
+	http.HandleFunc("/upload", uploadFileHandler)
 
-	// log.Print("Server started on port 8080")
-
-	conn, err := grpc.Dial(":7777", grpc.WithInsecure())
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
-	client := docker.NewDockerClient(conn)
-
-	response, err := client.Load(context.Background(), &docker.S3Object{
-		S3Key: "test-images.tar",
-	})
-	if err != nil {
+	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
 	}
 
-	log.Println(response)
+	log.Print("Server started on port 8080")
+}
 
-	var list []*docker.TagImage
-	var counter int
-	counter = 0
-	for _, element := range response.GetImages() {
-		counter = counter + 1
-		list = append(list, &docker.TagImage{
-			OldImage: element,
-			NewImage: &docker.Image{
-				Name: "bsuro10/tagggggeedddrantest" + strconv.Itoa(counter),
-			},
-		})
-	}
+func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
-	message, err := client.TagAndPush(context.Background(), &docker.TagAndPushObject{
-		TagImages: &docker.TagImagesList{
-			Images: list,
-		},
-		AuthConfig: &docker.AuthConfig{
-			Username: "bsuro10",
-			Password: "maginsuro",
-		},
-	})
-	if err != nil {
-		panic(err)
-	}
+	oc.DeployPod()
+}
 
-	log.Println(message)
+func renderError(w http.ResponseWriter, message string, statusCode int) {
+	w.WriteHeader(statusCode)
+	w.Write([]byte(message))
 }
