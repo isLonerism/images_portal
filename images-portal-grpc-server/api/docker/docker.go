@@ -111,21 +111,31 @@ func (s *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *
 			return nil, errors.New("Error occurred while encoding the auth config")
 		}
 
-		out, err := s.client.ImagePush(ctx, new_image, types.ImagePushOptions{
-			RegistryAuth: registryAuth,
-		})
+		err = pushImage(s, ctx, registryAuth, new_image)
 		if err != nil {
 			log.Println(err)
-			return nil, errors.New("Error occurred while pushing the image: " + new_image)
+			return nil, err
 		}
-		defer out.Close()
-
-		io.Copy(os.Stdout, out)
 	}
 
 	return &Message{
 		Message: "Successfull pushed!",
 	}, nil
+}
+
+func pushImage(s *DockerServiceServer, ctx context.Context, auth string, image string) error {
+
+	out, err := s.client.ImagePush(ctx, image, types.ImagePushOptions{
+		RegistryAuth: auth,
+	})
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	io.Copy(os.Stdout, out)
+
+	return nil
 }
 
 func encodedAuthConfig(username string, password string) (string, error) {
