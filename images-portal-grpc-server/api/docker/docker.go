@@ -49,10 +49,21 @@ func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*I
 	}
 	defer response.Body.Close()
 
-	images, err := getImagesList(response)
+	imagesList, err := convertImageLoadResponseToImagesList(response)
 	if err != nil {
 		log.Println(err)
-		return nil, errors.New("Error occurred while getting the images: " + err.Error())
+		return nil, errors.New("Error occurred while converting the images: " + err.Error())
+	}
+
+	return &ImagesList{
+		Images: imagesList,
+	}, nil
+}
+
+func convertImageLoadResponseToImagesList(response types.ImageLoadResponse) ([]*Image, error) {
+	images, err := getImagesList(response)
+	if err != nil {
+		return nil, err
 	}
 
 	var imagesList []*Image
@@ -62,9 +73,7 @@ func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*I
 		})
 	}
 
-	return &ImagesList{
-		Images: imagesList,
-	}, nil
+	return imagesList, nil
 }
 
 func downloadS3file(key string, bucket string, config *aws.Config) (*aws.WriteAtBuffer, error) {
