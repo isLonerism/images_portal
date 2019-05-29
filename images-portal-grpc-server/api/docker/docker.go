@@ -23,14 +23,14 @@ import (
 )
 
 type DockerServiceServer struct {
-	client *client.Client
+	dockerClient *client.Client
 }
 
-func RegisterDockerService(client *client.Client) *DockerServiceServer {
-	return &DockerServiceServer{client: client}
+func RegisterDockerService(dockerClient *client.Client) *DockerServiceServer {
+	return &DockerServiceServer{dockerClient: dockerClient}
 }
 
-func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*ImagesList, error) {
+func (dockerService *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*ImagesList, error) {
 	buff, err := downloadS3file((*s3_object).GetS3Key(), (*s3_object).GetS3Bucket(), &aws.Config{
 		Credentials:      credentials.NewStaticCredentials((*s3_object).GetS3Accesskey(), (*s3_object).GetS3Secretkey(), ""),
 		Endpoint:         aws.String((*s3_object).GetS3Endpoint()),
@@ -42,7 +42,7 @@ func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*I
 		return nil, errors.New("Error occurred while downloading the image: " + err.Error())
 	}
 
-	response, err := s.client.ImageLoad(ctx, bytes.NewReader((*buff).Bytes()), true)
+	response, err := dockerService.dockerClient.ImageLoad(ctx, bytes.NewReader((*buff).Bytes()), true)
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("Error occurred while loading the images: " + err.Error())
@@ -61,7 +61,7 @@ func (s *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*I
 }
 
 func convertImageLoadResponseToImagesList(response types.ImageLoadResponse) ([]*Image, error) {
-	images, err := getImagesList(response)
+	images, err := convertImageLoadResponseToString(response)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func downloadS3file(key string, bucket string, config *aws.Config) (*aws.WriteAt
 	return buff, err
 }
 
-func getImagesList(response types.ImageLoadResponse) (*[]string, error) {
+func convertImageLoadResponseToString(response types.ImageLoadResponse) (*[]string, error) {
 	images, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
@@ -103,12 +103,12 @@ func getImagesList(response types.ImageLoadResponse) (*[]string, error) {
 	return &list, nil
 }
 
-func (s *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *TagAndPushObject) (*Message, error) {
+func (dockerService *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *TagAndPushObject) (*Message, error) {
 	for _, element := range (*tagAndPushObject).GetTagImages().GetImages() {
 
 		old_image := element.GetOldImage().GetName()
 		new_image := element.GetNewImage().GetName()
-		if err := s.client.ImageTag(ctx, old_image, new_image); err != nil {
+		if err := dockerService.dockerClient.ImageTag(ctx, old_image, new_image); err != nil {
 			log.Println(err)
 			return nil, errors.New("Error occurred while tagging the images: " + err.Error())
 		}
@@ -120,7 +120,7 @@ func (s *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *
 			return nil, errors.New("Error occurred while encoding the auth config: " + err.Error())
 		}
 
-		err = pushImage(s, ctx, registryAuth, new_image)
+		err = pushImage(dockerService, ctx, registryAuth, new_image)
 		if err != nil {
 			log.Println(err)
 			return nil, errors.New("Error occurd while pushing the images: " + err.Error())
@@ -132,17 +132,17 @@ func (s *DockerServiceServer) TagAndPush(ctx context.Context, tagAndPushObject *
 	}, nil
 }
 
-func pushImage(s *DockerServiceServer, ctx context.Context, auth string, image string) error {
+func pushImage(dockerService *DockerServiceServer, ctx context.Context, auth string, image string) error {
 
-	out, err := s.client.ImagePush(ctx, image, types.ImagePushOptions{
+	response, err := dockerService.dockerClient.ImagePush(ctx, image, types.ImagePushOptions{
 		RegistryAuth: auth,
 	})
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer response.Close()
 
-	io.Copy(os.Stdout, out)
+	io.Copy(os.Stdout, response)
 
 	return nil
 }
