@@ -11,23 +11,23 @@ import (
 )
 
 func main() {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 7777))
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 7777))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	dockerClient, err := client.NewClientWithOpts(client.FromEnv)
 	if err != nil {
 		panic(err)
 	}
 
-	s := docker.RegisterDockerService(cli)
+	dockerService := docker.RegisterDockerService(dockerClient)
 
 	grpcServer := grpc.NewServer()
 
-	docker.RegisterDockerServer(grpcServer, s)
+	docker.RegisterDockerServer(grpcServer, dockerService)
 
-	if err := grpcServer.Serve(lis); err != nil {
+	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatalf("failed to serve: %s", err)
 	}
 }
