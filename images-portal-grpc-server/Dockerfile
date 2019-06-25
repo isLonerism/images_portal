@@ -6,7 +6,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /build/server ./s
 
 FROM docker:dind
 USER root
-COPY --from=builder /build/server /app/
+ENTRYPOINT ["/bin/sh" ,"-c"]
 WORKDIR /app
 EXPOSE 7777
-CMD ["./server"]
+CMD ["/usr/local/bin/dockerd-entrypoint.sh & ./server"]
+COPY --from=builder /build/server /app/
