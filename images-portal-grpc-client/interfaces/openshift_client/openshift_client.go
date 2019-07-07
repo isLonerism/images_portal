@@ -2,7 +2,6 @@ package openshift_client
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -18,7 +17,6 @@ import (
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 type PodInterface struct {
@@ -35,23 +33,23 @@ func init() {
 	var err error
 
 	// Out-Of-Cluster configuration
-	var kubeconfig *string
-	if home := homeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	}
-	flag.Parse()
-	config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// In-Cluster configuration
-	// config, err = rest.InClusterConfig()
+	// var kubeconfig *string
+	// if home := homeDir(); home != "" {
+	// 	kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	// } else {
+	// 	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	// }
+	// flag.Parse()
+	// config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	// if err != nil {
 	// 	panic(err.Error())
 	// }
+
+	//In-Cluster configuration
+	config, err = rest.InClusterConfig()
+	if err != nil {
+		panic(err.Error())
+	}
 
 	clientset, err = kubernetes.NewForConfig(config)
 	if err != nil {
@@ -61,7 +59,7 @@ func init() {
 
 func DeployPod(value int) (PodInterface, error) {
 	log.Println("value: " + strconv.Itoa(value))
-	template, err := os.Open("/home/paas/pod.yml") //file is configmap, path is env var
+	template, err := os.Open(os.Getenv("POD_TEMPLATE_PATH")) //file is configmap, path is env var
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -100,17 +98,21 @@ func DeployPod(value int) (PodInterface, error) {
 	var pod apiv1.Pod
 
 	podYaml.Seek(0, 0)
-	kubeyaml.NewYAMLOrJSONDecoder(podYaml, 1024).Decode(&pod) //buffer size is env var
+	size, err := strconv.Atoi(os.Getenv("YAML_DECODER_BUFFER_SIZE"))
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	kubeyaml.NewYAMLOrJSONDecoder(podYaml, size).Decode(&pod) //buffer size is env var
 
 	fmt.Println("Creating pod...")
-	result, err := clientset.CoreV1().Pods("myproject").Create(&pod) //project name is env var
+	result, err := clientset.CoreV1().Pods(os.Getenv("PROJECT")).Create(&pod) //project name is env var
 	if err != nil {
 		log.Println(err)
 		return PodInterface{"", ""}, err
 	}
 	fmt.Printf("Created pod %q.\n", result.GetObjectMeta().GetName())
 
-	watcher, err := clientset.CoreV1().Pods("myproject").Watch(metav1.ListOptions{ //project name is env var
+	watcher, err := clientset.CoreV1().Pods(os.Getenv("PROJECT")).Watch(metav1.ListOptions{ //project name is env var
 		LabelSelector: "name=" + name,
 	})
 	if err != nil {
@@ -120,7 +122,11 @@ func DeployPod(value int) (PodInterface, error) {
 
 	ch := watcher.ResultChan()
 
-	timer := time.NewTimer(20 * time.Second) //duration is env var
+	podWaitTime, err := strconv.Atoi(os.Getenv("POD_STARTUP_TIME"))
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	timer := time.NewTimer(time.Duration(podWaitTime) * time.Second) //duration is env var
 	go func() {
 		<-timer.C
 		watcher.Stop()
@@ -149,7 +155,7 @@ func DeployPod(value int) (PodInterface, error) {
 }
 
 func DeletePod(name string) error {
-	return clientset.CoreV1().Pods("myproject").Delete(name, &metav1.DeleteOptions{}) //project name is env var
+	return clientset.CoreV1().Pods(os.Getenv("PROJECT")).Delete(name, &metav1.DeleteOptions{}) //project name is env var
 }
 
 func homeDir() string {

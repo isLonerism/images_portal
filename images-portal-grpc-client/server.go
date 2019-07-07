@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strconv"
+	"os"
 	"sync"
 	"time"
 
@@ -32,18 +31,18 @@ type PushRequest struct {
 	Images      docker.TagImagesList
 }
 
+type PushResponse struct {
+	message string
+}
+
 var (
 	currentValue, currentSeconds = 0, -1
 	mux                          sync.Mutex
 )
 
 func main() {
-	http.HandleFunc("/upload", uploadFileHandler)
-
 	http.HandleFunc("/load", load)
 	http.HandleFunc("/push", push)
-
-	http.HandleFunc("/test", test)
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
@@ -51,6 +50,8 @@ func main() {
 }
 
 func load(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	var request LoadRequest
 	if succeeded := getLoadRequest(w, r, &request); !succeeded {
 		return
@@ -61,13 +62,7 @@ func load(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timer := time.NewTimer(20 * time.Second)
-
-	<-timer.C
-
-	log.Println("starting grpc")
-
-	imageList := callGRPCLoad(w, request)
+	imageList := callGRPCLoad(w, podInterface, request)
 	if imageList == nil {
 		return
 	}
@@ -77,23 +72,11 @@ func load(w http.ResponseWriter, r *http.Request) {
 }
 
 func push(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
 	var request PushRequest
 	if succeeded := getPushRequest(w, r, &request); !succeeded {
 		return
-	}
-
-	conn, err := makeGRPCConnection(w)
-	if err != nil {
-		return
-	}
-	defer conn.Close()
-
-	a := docker.TagAndPushObject{
-		TagImages: &request.Images,
-		AuthConfig: &docker.AuthConfig{ //get username and password from client
-			Password: request.DockerToken,
-			Username: "unused",
-		},
 	}
 
 	podBytes, err := base64.StdEncoding.DecodeString(request.PodToken)
@@ -110,6 +93,20 @@ func push(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	conn, err := makeGRPCConnection(w, podInterface)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	a := docker.TagAndPushObject{
+		TagImages: &request.Images,
+		AuthConfig: &docker.AuthConfig{ //get username and password from client
+			Password: request.DockerToken,
+			Username: "unused",
+		},
+	}
+
 	message, err := docker.NewDockerClient(conn).TagAndPush(context.Background(), &a)
 	if err != nil {
 		log.Println(err)
@@ -118,11 +115,11 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 	log.Println(message)
 
-	// send message or error to client
+	response := PushResponse{
+		message: "successfully pushed",
+	}
+	sendJSONResponse(w, response)
 
-	timer := time.NewTimer(60 * time.Second)
-
-	<-timer.C
 	err = oc.DeletePod(podInterface.PodName)
 	if err != nil {
 		log.Println(err)
@@ -131,20 +128,20 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func callGRPCLoad(w http.ResponseWriter, request LoadRequest) *docker.ImagesList {
-	conn, err := makeGRPCConnection(w)
+func callGRPCLoad(w http.ResponseWriter, podInterface oc.PodInterface, request LoadRequest) *docker.ImagesList {
+	conn, err := makeGRPCConnection(w, podInterface)
 	if err != nil {
 		return nil
 	}
 	defer conn.Close()
 
 	s3Object := docker.S3Object{
-		S3Key:       request.S3Key,                              //from client
-		S3Bucket:    "test",                                     //env var
-		S3Accesskey: "2SXSSELJRNSSX9V4UYV8",                     //env var
-		S3Secretkey: "p4wyUtqxYzj+1CeTJ8euxiwURJMr6swHPHEhj1gF", //env var
-		S3Endpoint:  "http://10.0.0.4:9000",                     //env var
-		S3Region:    "us-east-1",                                //env var
+		S3Key:       request.S3Key,            //from client
+		S3Bucket:    os.Getenv("S3Bucket"),    //env var
+		S3Accesskey: os.Getenv("S3Accesskey"), //env var
+		S3Secretkey: os.Getenv("S3Secretkey"), //env var
+		S3Endpoint:  os.Getenv("S3Endpoint"),  //env var
+		S3Region:    os.Getenv("S3Region"),    //env var
 	}
 	imageList, err := docker.NewDockerClient(conn).Load(context.Background(), &s3Object)
 	if err != nil {
@@ -158,8 +155,8 @@ func callGRPCLoad(w http.ResponseWriter, request LoadRequest) *docker.ImagesList
 	return imageList
 }
 
-func makeGRPCConnection(w http.ResponseWriter) (*grpc.ClientConn, error) {
-	conn, err := grpc.Dial("192.168.42.100:31192", grpc.WithInsecure()) //ip is from podInterface, port is env var
+func makeGRPCConnection(w http.ResponseWriter, podInterface oc.PodInterface) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(podInterface.PodIP+":"+os.Getenv("GRPC_PORT"), grpc.WithInsecure()) //ip is from podInterface, port is env var
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "unable to open grpc connection", http.StatusInternalServerError)
@@ -227,19 +224,10 @@ func isValidLoadRequest(request LoadRequest) bool {
 }
 
 func isValidPushRequest(request PushRequest) bool {
-	log.Println(request.PodToken)
-	log.Println(request.DockerToken)
-	log.Println(request.Images)
 	for _, item := range request.Images.Images {
-		log.Println(item.OldImage)
-		log.Println(item.NewImage)
 		if item.OldImage.Name == "" || item.NewImage.Name == "" {
 			return false
 		}
-	}
-	var r docker.TagImagesList
-	for _, item := range r.Images {
-		log.Println(item.OldImage.Name)
 	}
 	return request.PodToken != "" && request.DockerToken != ""
 }
@@ -299,155 +287,6 @@ func calcValue() int {
 		currentValue++
 	}
 	return currentValue
-}
-
-func test(w http.ResponseWriter, r *http.Request) {
-
-	var request PushRequest
-	if succeeded := getPushRequest(w, r, &request); !succeeded {
-		return
-	}
-
-	log.Println("after getPushRequest")
-
-	var podInterface oc.PodInterface
-	podBytes, err := base64.StdEncoding.DecodeString(request.PodToken)
-	if err != nil {
-		log.Println(err)
-	}
-
-	err = json.Unmarshal(podBytes, &podInterface)
-	if err != nil {
-		log.Println(err)
-	}
-
-	log.Println("finished")
-
-	log.Println(podInterface)
-}
-
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	mux.Lock()
-	_, _, seconds := time.Now().Clock()
-	if seconds != currentSeconds {
-		currentSeconds = seconds
-		currentValue = 0
-	} else {
-		currentValue++
-	}
-	value := currentValue
-	mux.Unlock()
-	log.Println("seconds: " + strconv.Itoa(seconds))
-	handleUpload(value, w, r)
-}
-
-func handleUpload(value int, w http.ResponseWriter, r *http.Request) {
-
-	podInterface, err := oc.DeployPod(value)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	log.Println(podInterface.PodName + " : " + podInterface.PodIP)
-
-	h := sha256.New()
-
-	h.Write([]byte(podInterface.PodName + podInterface.PodIP))
-	bh := base64.StdEncoding.EncodeToString(h.Sum(nil))
-
-	log.Println(bh)
-
-	retPodInterface := podInterface
-
-	conn, err := grpc.Dial("192.168.42.100:31190", grpc.WithInsecure()) //ip is from podInterface, port and security are env vars
-	if err != nil {
-		log.Println(err)
-	}
-	defer conn.Close()
-	c := docker.NewDockerClient(conn)
-
-	ctx := context.Background()
-
-	s3Object := docker.S3Object{
-		S3Key:       "statsd-exporter-vault.tar",                //from client
-		S3Bucket:    "test",                                     //env var
-		S3Accesskey: "2SXSSELJRNSSX9V4UYV8",                     //env var
-		S3Secretkey: "p4wyUtqxYzj+1CeTJ8euxiwURJMr6swHPHEhj1gF", //env var
-		S3Endpoint:  "http://10.0.0.4:9000",                     //env var
-		S3Region:    "us-east-1",                                //env var
-	}
-	images, err := c.Load(ctx, &s3Object)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	log.Println(images)
-
-	// loadResponse := LoadResponse{
-	// 	Token:  bh,
-	// 	Images: images,
-	// }
-
-	// log.Println(loadResponse)
-
-	// err = sendJSONResponse(w, loadResponse)
-	// if err != nil {
-	// 	log.Println(err)
-	// 	return
-	// }
-
-	//send bh and images to client
-
-	tag1 := docker.TagImage{
-		OldImage: &docker.Image{
-			Name: "prom/statsd-exporter:v0.5.0",
-		},
-		NewImage: &docker.Image{
-			Name: "docker-registry.default.svc:5000/myproject/prom:prom-tag",
-		},
-	}
-
-	tag2 := docker.TagImage{
-		OldImage: &docker.Image{
-			Name: "quay.io/coreos/vault:0.9.1-0",
-		},
-		NewImage: &docker.Image{
-			Name: "docker-registry.default.svc:5000/myproject/vault:vault-tag",
-		},
-	}
-
-	tags := docker.TagImagesList{
-		Images: []*docker.TagImage{
-			&tag1,
-			&tag2,
-		},
-	}
-
-	a := docker.TagAndPushObject{
-		TagImages: &tags,
-		AuthConfig: &docker.AuthConfig{ //get username and password from client
-			Password: "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJteXByb2plY3QiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlY3JldC5uYW1lIjoiYnVpbGRlci10b2tlbi1uZHFxYyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJidWlsZGVyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiYWUzNThmMDUtNTYwOS0xMWU5LTgzMTMtNTI1NDAwMWEwNmQxIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50Om15cHJvamVjdDpidWlsZGVyIn0.z5lZSat6hA2h-bqSyAuWHD_xLUYE_itXQQw48xoruMxHb3JKTTZfKQwaDByQpPbaCBubqvtcFt3xRLEE7HwB7lF-xpODa-K5U0glpLALFuIg8_MNshO9mSvMGrxqzXdW3ZtfvB5SjrtqMX5gKg3V8zRP2dwci4_snPovHaMduq7gHX0p-fNmER3rKInOVx7KCV1VfntRJuOTSskmely_wMDq4jL6JK0j_Py-CLHe1w9Cvnu87UUaahj5gRtV_OLxY_9w4azhLuInaj4lBdeQqDKMHq7LDkdYICt1zrdQKAzTM5qfivEVwcZH8C-6ui2GBXu626HuMQh6e2ANV9T3Cw",
-			Username: "unused",
-		},
-	}
-
-	message, err := c.TagAndPush(ctx, &a)
-	if err != nil {
-		log.Println(err)
-	}
-
-	log.Println(message)
-
-	// send message or error to client
-
-	err = oc.DeletePod(retPodInterface.PodName)
-	if err != nil {
-		log.Println(err)
-	}
-	log.Println("finished handling pod " + retPodInterface.PodName)
-	//}()
 }
 
 func renderError(w http.ResponseWriter, message string, statusCode int) {
