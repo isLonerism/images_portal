@@ -1,5 +1,5 @@
 window.ENV = {
-    "S3_BUCKET_NAME":"ordavid",
+    "S3_BUCKET_NAME":"testbucket",
     "S3_ACCESS_KEY_ID":"ordavid55",
     "S3_SECRET_ACCESS_KEY":"ordavid55",
     "S3_ENDPOINT":"http://172.17.0.2:9000",
