@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	oc "github.com/bsuro10/images-portal/images-portal-grpc-client/interfaces/openshift_client"
-	"github.com/bsuro10/images-portal/images-portal-grpc-server/api/docker"
+	oc "github.com/bsuro10/images_portal/images-portal-grpc-client/interfaces/openshift_client"
+	"github.com/bsuro10/images_portal/images-portal-grpc-server/api/docker"
 	"google.golang.org/grpc"
 )
 
