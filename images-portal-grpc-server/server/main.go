@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/bsuro10/images-portal/images-portal-grpc-server/api/docker"
+	"github.com/bsuro10/images_portal/images-portal-grpc-server/api/docker"
 	"github.com/docker/docker/client"
 	"google.golang.org/grpc"
 )
