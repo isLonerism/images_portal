@@ -10,23 +10,13 @@ class UploadTar extends React.Component {
             disableUpload: false
         };
 
-    this.uploadTarToS3 = this.uploadTarToS3.bind(this);
-    this.uploadTar = this.uploadTar.bind(this);
-
-/*     this.classes = makeStyles(theme => ({
-        button: {
-            margin: theme.spacing(1),
-            color: 'blue',
-        },
-        input: {
-            display: 'none',
-        },
-        })); */
+        this.uploadTarToS3 = this.uploadTarToS3.bind(this);
+        this.uploadTar = this.uploadTar.bind(this);
 
     };
 
     // File input change event, updates upload state and call UploadTarToS3 function
-    uploadTar (e) {
+    uploadTar(e) {
         this.setState({
             uploadState: 'UPLOADING...',
             disableUpload: true
@@ -35,23 +25,19 @@ class UploadTar extends React.Component {
         })
     }
 
-    uploadTarToS3 (e) {
-
-        // S3 necessary parameters
-/*         const S3_BUCKET_NAME = 'testbucket';
-        const S3_ACCESS_KEY_ID = 'ordavid';
-        const S3_SECRET_ACCESS_KEY = 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY';
-        const S3_ENDPOINT = 'http://172.17.0.2:9000'; */
+    uploadTarToS3(e) {
 
         // Assign chosen file to element
         let tarFile = this.uploadInput.files[0];
 
+        // Import async module for asynchronous iterations
+        let async = require('async')
+
         // Initialize new s3 service object using the s3 parameters and the chosen file
-        let s3 = new AWS.S3 ({
+        let s3 = new AWS.S3({
             params: {
                 Bucket: window.ENV.S3_BUCKET_NAME,
                 Key: tarFile.name,
-                Body: tarFile
             },
             credentials: {
                 accessKeyId: window.ENV.S3_ACCESS_KEY_ID,
@@ -64,40 +50,78 @@ class UploadTar extends React.Component {
             }
         })
 
-        // Upload the chosen file the bucket, render state according to outcome and update parent component upon success
-        s3.putObject(s3.params, function(err, data) {
-            if (err) {                
+        // Initiate a multipart file upload
+        s3.createMultipartUpload({}, function (err, multipart) {
+            if (err) {
+                console.log(err)
                 this.setState({ uploadState: 'Upload Failed' });
                 this.props.failStep('Upload Failed');
             }
             else {
-                this.setState({ uploadState: tarFile.name });
-                this.props.onTarUpload(tarFile.name);
-                console.log(data);
+                // Chunk size is 128 MB as per the minio standard
+                let chunkSize = Math.min(1024 * 1024 * 128, tarFile.size)
+                let parts = Math.ceil(tarFile.size / chunkSize)
+
+                // Send each chunk in an async loop
+                async.timesSeries(parts, (partNum, next) => {
+                    let rangeStart = partNum * chunkSize
+                    let rangeEnd = Math.min(rangeStart + chunkSize, tarFile.size)
+
+                    // s3 expects the part index to start from 1
+                    partNum++
+
+                    s3.uploadPart({
+                        Body: tarFile.slice(rangeStart, rangeEnd),
+                        PartNumber: partNum,
+                        UploadId: multipart.UploadId
+                    }, function (err, data) {
+                        next(err, {
+                            ETag: data.ETag,    // each part upload returns its ETag
+                            PartNumber: partNum
+                        })
+                    })
+                }, function (err, dataPacks) {
+                    s3.completeMultipartUpload({
+                        MultipartUpload: {
+                            Parts: dataPacks    // map of ETags and indices for each part
+                        },
+                        UploadId: multipart.UploadId
+                    }, function (err, data) {
+                        if (err) {
+                            console.log(err)
+                            this.setState({ uploadState: 'Upload Failed' });
+                            this.props.failStep('Upload Failed');
+                        }
+                        else {
+                            this.setState({ uploadState: tarFile.name });
+                            this.props.onTarUpload(tarFile.name);
+                            console.log(data);
+                        }
+                    }.bind(this))
+                }.bind(this))
             }
-        }.bind(this));
+        }.bind(this))
     }
 
     render() {
         return (
             <div>
                 <input
-                    /* className={this.classes.input} */
                     id="uploadInput"
                     type="file"
                     accept=".tar"
-                    onChange = {this.uploadTar}
+                    onChange={this.uploadTar}
                     disabled={this.state.disableUpload}
-                    ref= { (ref) => { this.uploadInput = ref; }}
+                    ref={(ref) => { this.uploadInput = ref; }}
                     style={{ display: 'none' }}
                 />
                 <label htmlFor="uploadInput">
-                    <Button 
+                    <Button
                         size="small"
                         variant="contained"
                         color="primary"
                         component="span">
-                    { this.state.uploadState }
+                        {this.state.uploadState}
                     </Button>
                 </label>
             </div>
