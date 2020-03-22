@@ -11,5 +11,4 @@ window.ENV = {
     "PUSH_TIMEOUT_MS": "180000",
     "OAUTH_OPENSHIFT_ROUTE": "https://192.168.42.116",
     "OAUTH_CLIENT_ID": "openshift-images-portal"
-/*  "USER_ACCESS_TOKEN" is available upon authentication */
 }
