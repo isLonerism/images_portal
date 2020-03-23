@@ -6,10 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
 	"io/ioutil"
 	"log"
-	"os"
 	"regexp"
 	"strings"
 
@@ -123,12 +121,12 @@ func (dockerService *DockerServiceServer) TagAndPush(ctx context.Context, tagAnd
 		err = pushImage(dockerService, ctx, registryAuth, new_image)
 		if err != nil {
 			log.Println(err)
-			return nil, errors.New("Error occurd while pushing the images: " + err.Error())
+			return nil, errors.New("Error occured while pushing the images: " + err.Error())
 		}
 	}
 
 	return &Message{
-		Message: "Successfull pushed!",
+		Message: "Successfully pushed!",
 	}, nil
 }
 
@@ -142,7 +140,20 @@ func pushImage(dockerService *DockerServiceServer, ctx context.Context, auth str
 	}
 	defer response.Close()
 
-	io.Copy(os.Stdout, response)
+	responseBytes, err := ioutil.ReadAll(response)
+	if err != nil {
+		return err
+	}
+
+	statusJSON := make(map[string]string)
+	for _, statusBytes := range bytes.Split(responseBytes, []byte("\n")) {
+		log.Println(string(statusBytes))
+		json.Unmarshal(statusBytes, &statusJSON)
+
+		if statusError, exists := statusJSON["error"]; exists {
+			return errors.New(statusError)
+		}
+	}
 
 	return nil
 }
