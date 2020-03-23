@@ -54,16 +54,25 @@ func load(w http.ResponseWriter, r *http.Request) {
 
 	var request LoadRequest
 	if succeeded := getLoadRequest(w, r, &request); !succeeded {
+		http.Error(w, "failed to parse the request", http.StatusBadRequest)
 		return
 	}
 
 	podInterface, err := deployPod(w)
 	if err != nil {
+		http.Error(w, "failed to deploy loading pod", http.StatusInternalServerError)
 		return
 	}
 
 	imageList := callGRPCLoad(w, podInterface, request)
 	if imageList == nil {
+		http.Error(w, "failed to retrieve image list", http.StatusBadRequest)
+
+		err := deletePod(podInterface)
+		if err != nil {
+			log.Println(err)
+		}
+
 		return
 	}
 
@@ -76,6 +85,7 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 	var request PushRequest
 	if succeeded := getPushRequest(w, r, &request); !succeeded {
+		http.Error(w, "failed to parse the request", http.StatusBadRequest)
 		return
 	}
 
@@ -95,6 +105,14 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 	conn, err := makeGRPCConnection(w, podInterface)
 	if err != nil {
+		log.Println(err)
+		http.Error(w, "could not establish connection with loading pod", http.StatusInternalServerError)
+
+		err := deletePod(podInterface)
+		if err != nil {
+			log.Println(err)
+		}
+
 		return
 	}
 	defer conn.Close()
@@ -110,22 +128,18 @@ func push(w http.ResponseWriter, r *http.Request) {
 	message, err := docker.NewDockerClient(conn).TagAndPush(context.Background(), &a)
 	if err != nil {
 		log.Println(err)
-		http.Error(w, "grpc server failed during push", http.StatusBadRequest)
+		http.Error(w, "grpc server failed during push: "+err.Error(), http.StatusBadRequest)
+	} else {
+		log.Println(message)
+		sendJSONResponse(w, PushResponse{
+			message: message.String(),
+		})
 	}
 
-	log.Println(message)
-
-	response := PushResponse{
-		message: "successfully pushed",
-	}
-	sendJSONResponse(w, response)
-
-	err = oc.DeletePod(podInterface.PodName)
+	err = deletePod(podInterface)
 	if err != nil {
 		log.Println(err)
 	}
-	log.Println("finished handling pod " + podInterface.PodName)
-
 }
 
 func callGRPCLoad(w http.ResponseWriter, podInterface oc.PodInterface, request LoadRequest) *docker.ImagesList {
@@ -189,6 +203,16 @@ func deployPod(w http.ResponseWriter) (oc.PodInterface, error) {
 	}
 	log.Println(podInterface)
 	return podInterface, nil
+}
+
+func deletePod(podInterface oc.PodInterface) error {
+	err := oc.DeletePod(podInterface.PodName)
+	if err != nil {
+		return err
+	}
+
+	log.Println("finished handling pod " + podInterface.PodName)
+	return nil
 }
 
 func getLoadRequest(w http.ResponseWriter, r *http.Request, request *LoadRequest) bool {
