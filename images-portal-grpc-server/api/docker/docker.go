@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,12 +32,14 @@ func RegisterDockerService(dockerClient *client.Client) *DockerServiceServer {
 }
 
 func (dockerService *DockerServiceServer) Load(ctx context.Context, s3_object *S3Object) (*ImagesList, error) {
-	buff, err := downloadS3file((*s3_object).GetS3Key(), (*s3_object).GetS3Bucket(), &aws.Config{
+	config := &aws.Config{
 		Credentials:      credentials.NewStaticCredentials((*s3_object).GetS3Accesskey(), (*s3_object).GetS3Secretkey(), ""),
 		Endpoint:         aws.String((*s3_object).GetS3Endpoint()),
 		Region:           aws.String((*s3_object).GetS3Region()),
 		S3ForcePathStyle: aws.Bool(true),
-	})
+	}
+
+	buff, err := downloadS3file((*s3_object).GetS3Key(), (*s3_object).GetS3Bucket(), config)
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("Error occurred while downloading the image: " + err.Error())
@@ -53,6 +56,19 @@ func (dockerService *DockerServiceServer) Load(ctx context.Context, s3_object *S
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("Error occurred while converting the images: " + err.Error())
+	}
+
+	deleteAfterLoad, err := strconv.ParseBool(os.Getenv("DELETE_OBJECT_AFTER_LOAD"))
+	if err != nil {
+		log.Println(err)
+		deleteAfterLoad = false
+	}
+
+	if deleteAfterLoad {
+		err := deleteS3file((*s3_object).GetS3Key(), (*s3_object).GetS3Bucket(), config)
+		if err != nil {
+			return nil, errors.New("Error occured while deleting object: " + err.Error())
+		}
 	}
 
 	return &ImagesList{
@@ -85,6 +101,16 @@ func downloadS3file(key string, bucket string, config *aws.Config) (*aws.WriteAt
 	})
 
 	return buff, err
+}
+
+func deleteS3file(key string, bucket string, config *aws.Config) error {
+	svc := s3.New(session.New(config))
+	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+
+	return err
 }
 
 func convertImageLoadResponseToString(response types.ImageLoadResponse) (*[]string, error) {
