@@ -1,53 +1,79 @@
 import React from 'react';
 import Input from '@material-ui/core/Input';
 import Checkbox from '@material-ui/core/Checkbox';
-//import { TextField } from '@material-ui/core';
+import Select from '@material-ui/core/Select';
 
 class TagImage extends React.Component {
     constructor(props) {
         super(props);
         this.state = {
+            project: this.props.projectList[0],
+            name: this.getNameFromFullName(this.props.image),
+            tag: this.getTagFromFullName(this.props.image),
             isTagged: false,
-            newImageTag: this.props.imageTag.substring(this.props.imageTag.lastIndexOf("/")+1)
         };
 
-        this.confirmTag = this.confirmTag.bind(this);
-        this.handleChange = this.handleChange.bind(this);
+        this.handleTagChange = this.handleTagChange.bind(this)
+        this.getTagFromFullName = this.getTagFromFullName.bind(this)
+        this.getNameFromFullName = this.getNameFromFullName.bind(this)
     };
 
-    confirmTag (e) {
+    getTagFromFullName = (fullname) => {
+        return fullname.substring(fullname.lastIndexOf(":") + 1)
+    }
+
+    getNameFromFullName = (fullname) => {
+        return fullname.substring(fullname.lastIndexOf("/") + 1, fullname.lastIndexOf(":"))
+    }
+
+    handleTagChange() {
         this.setState({
-            isTagged: true
+            isTagged: !this.state.isTagged
         }, () => {
-            this.props.taggedImage(
-                this.props.imageTag,
-                this.props.projectName + '/' + this.state.newImageTag
-            );
-        });
-    };
-
-    handleChange (e) {
-        this.setState({
-            newImageTag: e.target.value
-        });
-    };
+            var newImage = this.state.project + "/" + this.state.name + ":" + this.state.tag
+            this.props.handleTagChange(this.props.image, newImage, this.state.isTagged)
+        })
+    }
 
     render() {
         return (
             <div>
-                {this.props.projectName}/
+                <Select
+                    native
+                    style={{ width: '15%' }}
+                    value={this.state.project}
+                    disabled={this.state.isTagged}
+                    onChange={(event) => {
+                        this.setState({
+                            project: event.target.value
+                        })
+                    }}
+                >
+                    {this.props.projectList.map(project =>
+                        <option key={project} value={project}>{project}</option>)}
+                </Select>
+                <span style={{ marginLeft: "12px", marginRight: "12px" }}>/</span>
                 <Input
-                    style ={{width: '50%'}}
+                    style={{ width: '40%' }}
                     type='text'
-                    defaultValue={this.props.imageTag.substring(this.props.imageTag.lastIndexOf("/")+1)}
-                    //defaultValue={this.props.imageTag}
-                    disabled={this.props.projectName === '' || this.state.isTagged}
-                    onChange={this.handleChange}>
+                    disabled={this.state.isTagged}
+                    placeholder={this.getNameFromFullName(this.props.image)}
+                    onChange={(event) => { this.setState({ name: event.target.value }) }}
+                    defaultValue={this.state.name}>
+                </Input>
+                <span style={{ marginLeft: "12px", marginRight: "12px" }}>:</span>
+                <Input
+                    style={{ width: '15%' }}
+                    type='text'
+                    disabled={this.state.isTagged}
+                    placeholder={this.getTagFromFullName(this.props.image)}
+                    onChange={(event) => { this.setState({ tag: event.target.value }) }}
+                    defaultValue={this.state.tag}>
                 </Input>
                 <Checkbox
                     color="primary"
-                    onClick={this.confirmTag}
-                    disabled={this.props.projectName === '' || this.state.isTagged}>
+                    checked={this.state.isTagged}
+                    onClick={this.handleTagChange}>
                 </Checkbox>
             </div>
         )
