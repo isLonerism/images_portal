@@ -1,0 +1,7 @@
+apiVersion: oauth.openshift.io/v1
+grantMethod: auto
+kind: OAuthClient
+metadata:
+  name: openshift-images-portal
+redirectURIs:
+- http://localhost:3000 # replace with route to images portal
