@@ -1,0 +1,9 @@
+{
+    "version": 1,
+    "credentials": {
+        "accessKey": "${GRPC_SERVER_S3_ACCESS_KEY}",
+        "secretKey": "${GRPC_SERVER_S3_SECRET_KEY}",
+        "expiration": "0001-01-01T00:00:00Z",
+        "status": "enabled"
+    }
+}

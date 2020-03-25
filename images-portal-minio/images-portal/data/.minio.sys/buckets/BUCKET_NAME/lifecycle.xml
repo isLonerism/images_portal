@@ -1,0 +1,1 @@
+<LifecycleConfiguration><Rule><Status>Enabled</Status><Filter><And></And><Tag></Tag></Filter><Expiration><Days>${BUCKET_LIFECYCLE_DAYS}</Days></Expiration></Rule></LifecycleConfiguration>
