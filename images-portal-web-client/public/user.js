@@ -35,21 +35,16 @@ window.addEventListener('load', () => {
 
     // redirect to authentication screen if access token is not present
     else {
-        let redirectUrl = window.ENV.OAUTH_OPENSHIFT_ROUTE + '/login?then=' + encodeURIComponent('/oauth/authorize?')
+        let redirectUrl = window.ENV.OAUTH_OPENSHIFT_ROUTE + '/oauth/authorize?'
 
         // parameters passed to OpenShift OAuth server
-        let redirectParams = {
+        let redirectParams = new URLSearchParams({
             client_id: window.ENV.OAUTH_CLIENT_ID,
             redirect_uri: window.location.origin,
             response_type: 'token'
-        }
-
-        // encode entire queries, including '=' and '&'
-        for (let param in redirectParams) {
-            redirectUrl += encodeURIComponent(param + "=" + redirectParams[param] + '&')
-        }
+        })
 
         // redirect to OAuth server (remove trailing ampersand)
-        window.location.replace(redirectUrl.slice(0, -3))
+        window.location.replace(redirectUrl + redirectParams.toString())
     }
 })
