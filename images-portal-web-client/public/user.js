@@ -14,7 +14,7 @@ window.addEventListener('load', () => {
 
         // prepare API request for user's projects
         let xhr = new XMLHttpRequest()
-        xhr.open('GET', window.ENV.OAUTH_OPENSHIFT_ROUTE + ':8443/oapi/v1/projects')
+        xhr.open('GET', window.ENV.OAUTH_OPENSHIFT_ROUTE + '/oapi/v1/projects')
         xhr.setRequestHeader('Authorization', 'Bearer ' + window.USER.ACCESS_TOKEN)
         xhr.setRequestHeader('Accept', 'application/json')
 
@@ -35,7 +35,7 @@ window.addEventListener('load', () => {
 
     // redirect to authentication screen if access token is not present
     else {
-        let redirectUrl = window.ENV.OAUTH_OPENSHIFT_ROUTE + ':8443/login?then=' + encodeURIComponent('/oauth/authorize?')
+        let redirectUrl = window.ENV.OAUTH_OPENSHIFT_ROUTE + '/login?then=' + encodeURIComponent('/oauth/authorize?')
 
         // parameters passed to OpenShift OAuth server
         let redirectParams = {
