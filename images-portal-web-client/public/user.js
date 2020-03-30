@@ -44,7 +44,7 @@ window.addEventListener('load', () => {
             response_type: 'token'
         })
 
-        // redirect to OAuth server (remove trailing ampersand)
+        // redirect to OAuth server
         window.location.replace(redirectUrl + redirectParams.toString())
     }
 })
