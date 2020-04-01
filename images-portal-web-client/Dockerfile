@@ -12,6 +12,7 @@ RUN npm run build
 # production environment
 FROM nginx:1.16.0-alpine
 COPY --from=build /app/build /usr/share/nginx/html
+COPY run.sh /tmp
 COPY ca-certificates-20190108-r0.apk /tmp/ca-certificates-20190108-r0.apk
 RUN sed -i s/"listen .*80"/"listen 3200"/ /etc/nginx/conf.d/default.conf \
     && chmod -R 777 /var/run /var/log/nginx /var/cache/nginx/ /etc/nginx/* \
@@ -19,5 +20,5 @@ RUN sed -i s/"listen .*80"/"listen 3200"/ /etc/nginx/conf.d/default.conf \
     && apk add --repositories-file=repo.list --allow-untrusted --no-network --no-cache /tmp/ca-certificates-20190108-r0.apk \
     && update-ca-certificates
 EXPOSE 3200
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/tmp/run.sh"]
 
