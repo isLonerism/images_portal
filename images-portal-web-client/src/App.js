@@ -14,7 +14,6 @@ import Typography from '@material-ui/core/Typography';
 import Box from '@material-ui/core/Box';
 import AppBar from '@material-ui/core/AppBar';
 import { Container, Toolbar, Tooltip } from '@material-ui/core';
-import initENVNamespace from './environment.js';
 
 class App extends React.Component {
   constructor () {
@@ -52,9 +51,6 @@ class App extends React.Component {
         padding: theme.spacing(3),
       },
     }));
-
-    // Initialize ENV namespace from environment variables
-    initENVNamespace();
 
     // Initialize steps
     this.steps = this.getSteps();
