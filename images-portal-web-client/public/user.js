@@ -16,6 +16,7 @@ window.addEventListener('load', () => {
         let xhr = new XMLHttpRequest()
         xhr.open('GET', window.ENV.OAUTH_OPENSHIFT_ROUTE + '/apis/project.openshift.io/v1/projects')
         xhr.setRequestHeader('Authorization', 'Bearer ' + window.USER.ACCESS_TOKEN)
+        xhr.setRequestHeader('Access-Control-Allow-Origin', '*')
         xhr.setRequestHeader('Accept', 'application/json')
 
         // API response callback
