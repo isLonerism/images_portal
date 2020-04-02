@@ -16,7 +16,7 @@ Load image archives to internal registry directly without the additional work.
 
 ## Procedure
 
-1. (OPTIONAL) [images-portal-minio/](Deploy an instance of minio) if you do not have any object storage services available
-2. [images-portal-grpc-server](Take care of gRPC server pre-requisites)
-3. [images-portal-grpc-client](Deploy the gRPC client)
-4. [images-portal-web-client](Deploy the web client)
+1. (OPTIONAL) [Deploy an instance of minio](images-portal-minio/) if you do not have any object storage services available
+2. [Take care of gRPC server pre-requisites](images-portal-grpc-server/)
+3. [Deploy the gRPC client](images-portal-grpc-client/)
+4. [Deploy the web client](images-portal-web-client/)
