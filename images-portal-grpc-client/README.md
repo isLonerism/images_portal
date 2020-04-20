@@ -30,3 +30,8 @@ gRPC client handles requests coming from the web client and interacts with the g
 1. Get all go dependencies and build the server executable
 2. Build and push the image from provided Dockerfile
 3. Deploy image with the required configuration described above
+4. Expose the created service using a route and enlarge the route timeout value:
+
+```sh
+oc annotate route <grpc-client-route> --overwrite haproxy.router.openshift.io/timeout=600s
+```

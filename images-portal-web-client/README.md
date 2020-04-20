@@ -13,8 +13,8 @@ Interface for users to use to upload their images.
 * S3_SECRET_ACCESS_KEY: (use secret key value from web client secret)
 * S3_ENDPOINT: (use S3 host value from S3 data configmap)
 * S3_UPLOAD_TIMEOUS_MS: timeout (ms) for S3 upload requests
-* IMAGE_PUSH_ROUTE: route/service URL to send the push request to
-* IMAGE_LOAD_ROUTE: route/service URL to send the push request to
+* IMAGE_PUSH_ROUTE: route URL to send the push request to
+* IMAGE_LOAD_ROUTE: route URL to send the load request to
 * OSFT_REGISTRY_PREFIX: route/service URL to the internal image registry
 * LOAD_TIMEOUT_MS: timeout (ms) for image load request
 * PUSH_TIMEOUT_MS: timeout (ms) for image push request
