@@ -33,3 +33,4 @@ Interface for users to use to upload their images.
 2. Deploy image with the required configuration described above
 3. Expose the web client using a route
 4. Add the route URL to "redirectURIs" list within oauth_client.yml and create an OAuthClient object out of oauth_client.yml
+5. Add the route URL to the "corsAllowedOrigins" list within each master-config.yml
