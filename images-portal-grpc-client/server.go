@@ -65,14 +65,12 @@ func projects(w http.ResponseWriter, r *http.Request) {
 	var request ProjectsRequest
 	if succeeded := getProjectsRequest(w, r, &request); !succeeded {
 		log.Println("could not unmarshal request")
-		http.Error(w, "missing projects request params", http.StatusBadRequest)
 		return
 	}
 
 	projectList := getProjectsList(request)
 	if projectList == nil {
 		log.Println("could not generate project list")
-		http.Error(w, "could not generate project list", http.StatusInternalServerError)
 		return
 	}
 
@@ -276,7 +274,7 @@ func getProjectsRequest(w http.ResponseWriter, r *http.Request, request *Project
 	log.Println(request)
 
 	if valid := isValidProjectsRequest(*request); !valid {
-		http.Error(w, "missing load request params", http.StatusBadRequest)
+		http.Error(w, "missing projects request params", http.StatusBadRequest)
 		return false
 	}
 	return true
