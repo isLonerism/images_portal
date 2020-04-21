@@ -21,12 +21,17 @@ window.addEventListener('load', () => {
         // API response callback
         xhr.onreadystatechange = function () {
             if (xhr.readyState == XMLHttpRequest.DONE) {
-                projectList = JSON.parse(xhr.responseText)
+                if (xhr.status == 200) {
+                    projectList = JSON.parse(xhr.responseText)
 
-                // map a list of user's projects
-                window.USER.PROJECT_LIST = projectList['items'].map(function (project) {
-                    return project['metadata']['name']
-                })
+                    // map a list of user's projects
+                    window.USER.PROJECT_LIST = projectList['items'].map(function (project) {
+                        return project['metadata']['name']
+                    })
+                }
+                else {
+                    console.log("Could not get user's projects")
+                }
             }
         }
 
