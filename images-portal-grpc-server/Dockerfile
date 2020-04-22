@@ -6,6 +6,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /build/server ./s
 
 FROM docker:1.12.1-dind
 USER root
+ENV DOCKER_HOST="tcp://localhost:2375" \ 
+    DOCKER_API_VERSION="1.24"
 ENTRYPOINT ["/bin/sh" ,"-c"]
 WORKDIR /app
 EXPOSE 7777

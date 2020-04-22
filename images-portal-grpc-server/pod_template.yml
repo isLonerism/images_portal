@@ -10,17 +10,11 @@ spec:
         ports:
         - containerPort: 7777             # grpc server
           protocol: TCP
-        - containerPort: 2375             # docker daemon
-          protool: TCP
         resources: 
             requests: 
                 cpu: 10m 
                 memory: 256Mi 
         env: 
-          - name: DOCKER_HOST 
-            value: "tcp://localhost:2375" # docker daemon
-          - name: DOCKER_API_VERSION
-            value: "1.24"                 # match server API version
         securityContext: 
             privileged: true              # docker-in-docker must run as a privileged container
         volumeMounts: 
