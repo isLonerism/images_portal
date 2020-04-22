@@ -159,7 +159,7 @@ func push(w http.ResponseWriter, r *http.Request) {
 func getProjectsList(request ProjectsRequest) []string {
 	req, err := http.NewRequest("GET", request.APIEndpoint+"/apis/project.openshift.io/v1/projects", nil)
 	if err != nil {
-		log.Println("could not create request")
+		http.Error(w, "could not create projects request", http.StatusInternalServerError)
 		log.Println(err)
 		return nil
 	}
@@ -173,7 +173,7 @@ func getProjectsList(request ProjectsRequest) []string {
 
 	res, err := client.Do(req)
 	if err != nil {
-		log.Println("Error response received")
+		http.Error(w, "error response received from API", http.StatusBadRequest)
 		log.Println(err)
 		return nil
 	}
@@ -182,7 +182,7 @@ func getProjectsList(request ProjectsRequest) []string {
 	resJSON := map[string]interface{}{}
 	err = json.NewDecoder(res.Body).Decode(&resJSON)
 	if err != nil {
-		log.Println("Could not decode response body")
+		http.Error(w, "unexpected response received from API", http.StatusInternalServerError)
 		log.Println(err)
 		return nil
 	}
