@@ -173,7 +173,7 @@ func getProjectsList(request ProjectsRequest) []string {
 
 	res, err := client.Do(req)
 	if err != nil {
-		http.Error(w, "error response received from API", http.StatusBadRequest)
+		http.Error(w, "error response received from API", res.StatusCode)
 		log.Println(err)
 		return nil
 	}
