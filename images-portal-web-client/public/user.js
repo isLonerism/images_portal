@@ -14,20 +14,13 @@ window.addEventListener('load', () => {
 
         // prepare API request for user's projects
         let xhr = new XMLHttpRequest()
-        xhr.open('GET', window.ENV.OPENSHIFT_API_ENDPOINT + '/apis/project.openshift.io/v1/projects')
-        xhr.setRequestHeader('Authorization', 'Bearer ' + window.USER.ACCESS_TOKEN)
-        xhr.setRequestHeader('Accept', 'application/json')
+        xhr.open('POST', window.ENV.PROJECTS_REQUEST_ROUTE)
 
         // API response callback
         xhr.onreadystatechange = function () {
             if (xhr.readyState == XMLHttpRequest.DONE) {
                 if (xhr.status == 200) {
-                    projectList = JSON.parse(xhr.responseText)
-
-                    // map a list of user's projects
-                    window.USER.PROJECT_LIST = projectList['items'].map(function (project) {
-                        return project['metadata']['name']
-                    })
+                    window.USER.PROJECT_LIST = JSON.parse(xhr.responseText)["ProjectList"]
                 }
                 else {
                     console.log("Could not get user's projects")
@@ -35,7 +28,10 @@ window.addEventListener('load', () => {
             }
         }
 
-        xhr.send()
+        xhr.send(JSON.stringify({
+            APIEndpoint: window.ENV.OPENSHIFT_API_ENDPOINT,
+            Token: window.USER.ACCESS_TOKEN
+        }))
     }
 
     // redirect to authentication screen if access token is not present
