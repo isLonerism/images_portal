@@ -18,7 +18,9 @@ Interface for users to use to upload their images.
 * OSFT_REGISTRY_PREFIX: route/service URL to the internal image registry
 * LOAD_TIMEOUT_MS: timeout (ms) for image load request
 * PUSH_TIMEOUT_MS: timeout (ms) for image push request
-* OAUTH_OPENSHIFT_ROUTE: full URL to OpenShift master api
+* OPENSHIFT_API_ENDPOINT: this endpoint will be queried for user projects
+* OPENSHIFT_OAUTH_ENDPOINT: this endpoint will be queried for authentication token
+* PROJECTS_REQUEST_ROUTE: gRPC route to proxy the projects request through
 * OAUTH_CLIENT_ID: client ID of the created OAuthClient object
 
 ### Other
