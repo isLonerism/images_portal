@@ -68,7 +68,7 @@ func projects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projectList := getProjectsList(request)
+	projectList := getProjectsList(w, request)
 	if projectList == nil {
 		log.Println("could not generate project list")
 		return
@@ -156,7 +156,7 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func getProjectsList(request ProjectsRequest) []string {
+func getProjectsList(w http.ResponseWriter, request ProjectsRequest) []string {
 	req, err := http.NewRequest("GET", request.APIEndpoint+"/apis/project.openshift.io/v1/projects", nil)
 	if err != nil {
 		http.Error(w, "could not create projects request", http.StatusInternalServerError)
