@@ -91,11 +91,9 @@ class App extends React.Component {
         <Typography variant="button">Load Images to Docker</Typography>
       </Tooltip>,
       <Tooltip
-        title="Tag the images loaded from the tar archive. 
-               Specify once your OpenShift project's name,
-               And then modify the name and version of each image (if needed) according to your
-               needs, in the following format: 'name:version'.
-               Review your images before clicking on the checkbox - cannot undo changes!"
+        title="Tag the images loaded from the tar archive.
+               Specify each image's project, name and tag.
+               Images will be retagged and pushed once all checkboxes are checked."
         placement="top">
         <Typography variant="button">Tag Images</Typography>
       </Tooltip>,
@@ -161,7 +159,7 @@ class App extends React.Component {
 
   render () {
     return (
-      <Container maxWidth="sm">
+      <Container maxWidth="md">
         <AppBar color="primary">
           <Toolbar style={{display: "grid"}}>
             <Typography variant="h6" align="center">
@@ -169,7 +167,7 @@ class App extends React.Component {
             </Typography>
           </Toolbar>
         </AppBar>
-        <Box marginTop="25%" border={1} borderColor="primary.main">
+        <Box marginTop="15%" border={1} borderColor="primary.main" >
           <Stepper activeStep={this.state.activeStep} orientation="vertical">
             {this.steps.map((label, index) => (
               <Step key={label}>

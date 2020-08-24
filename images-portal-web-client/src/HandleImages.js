@@ -1,68 +1,54 @@
 import React from 'react';
 import TagImage from './TagImage';
-import { TextField } from '@material-ui/core';
 
 class HandleImages extends React.Component {
     constructor(props) {
         super(props);
-        this.state = {
-            projectName: ''
-        };
+        this.state = {};
 
-        this.taggedImageList = [];
+        this.taggedImageList = []
 
-        this.addTaggedImage = this.addTaggedImage.bind(this);
-        this.handleProjctChange = this.handleProjctChange.bind(this);
+        this.handleTagChange = this.handleTagChange.bind(this);
     };
 
     // Get old image name and new image name
-    addTaggedImage = (image, taggedImage) => {
-        this.taggedImageList.push({
+    handleTagChange = (oldImage, newImage, tagged) => {
+        var taggedImage = {
             old_image: {
-                name: image
+                name: oldImage
             },
             new_image: {
-                name: window.ENV.OSFT_REGISTRY_PREFIX + '/' + taggedImage
+                name: window.ENV.OSFT_REGISTRY_PREFIX + '/' + newImage
             }
-        });
+        }
 
-        // Check if all images are tagged
-        if (this.taggedImageList.length === this.props.imageList.length) {
-            // Initialize tagged image list in parent component
-            this.props.taggedImageList(this.taggedImageList);
+        // Add or remove image from list based on checkbox status
+        if (!tagged) {
+            this.taggedImageList.splice(this.taggedImageList.indexOf(taggedImage), 1)
+        } else {
+            this.taggedImageList.push(taggedImage)
 
-            console.log('Finished tagging all elements');
-            console.log (this.taggedImageList);
-        };
-    };
+            // Check if all images are tagged
+            if (this.taggedImageList.length === this.props.imageList.length) {
+                // Initialize tagged image list in parent component
+                this.props.taggedImageList(this.taggedImageList);
 
-    handleProjctChange (e) {
-        this.setState({
-            projectName: e.target.value
-        });
+                console.log('Finished tagging all elements');
+                console.log(this.taggedImageList);
+            }
+        }
     }
 
     render() {
-        var taggedImages = this.props.imageList.map(image =>
-            <TagImage
-                key={image.name}
-                imageTag={image.name}
-                projectName={this.state.projectName}
-                taggedImage={this.addTaggedImage}>
-            </TagImage> );
         return (
             <div>
-                <TextField
-                    required
-                    id="outlined-required"
-                    label="Project Name"
-                    placeholder="Project Name"
-                    margin="dense"
-                    variant="outlined"
-                    helperText="OpenShift Project Name (Namespace)"
-                    onChange={this.handleProjctChange}
-                />
-                {taggedImages}
+                {this.props.imageList.map(image =>
+                    <TagImage
+                        key={image.name}
+                        image={image.name}
+                        projectList={window.USER.PROJECT_LIST}
+                        handleTagChange={this.handleTagChange}>
+                    </TagImage>)}
             </div>
         )
     }
