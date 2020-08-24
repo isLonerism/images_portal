@@ -16,6 +16,15 @@ import (
 	"google.golang.org/grpc"
 )
 
+type ProjectsRequest struct {
+	APIEndpoint string
+	Token       string
+}
+
+type ProjectsResponse struct {
+	ProjectList []string
+}
+
 type LoadRequest struct {
 	S3Key string
 }
@@ -43,10 +52,29 @@ var (
 func main() {
 	http.HandleFunc("/load", load)
 	http.HandleFunc("/push", push)
+	http.HandleFunc("/projects", projects)
 
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
 	}
+}
+
+func projects(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	var request ProjectsRequest
+	if succeeded := getProjectsRequest(w, r, &request); !succeeded {
+		log.Println("could not unmarshal request")
+		return
+	}
+
+	projectList := getProjectsList(w, request)
+	if projectList == nil {
+		log.Println("could not generate project list")
+		return
+	}
+
+	sendProjectsResponse(w, projectList)
 }
 
 func load(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +156,45 @@ func push(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func getProjectsList(w http.ResponseWriter, request ProjectsRequest) []string {
+	req, err := http.NewRequest("GET", request.APIEndpoint+"/apis/project.openshift.io/v1/projects", nil)
+	if err != nil {
+		http.Error(w, "could not create projects request", http.StatusInternalServerError)
+		log.Println(err)
+		return nil
+	}
+
+	req.Header.Add("Authorization", "Bearer "+request.Token)
+	req.Header.Add("Accept", "application/json")
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "error response received from API", res.StatusCode)
+		log.Println(err)
+		return nil
+	}
+	defer res.Body.Close()
+
+	resJSON := map[string]interface{}{}
+	err = json.NewDecoder(res.Body).Decode(&resJSON)
+	if err != nil {
+		http.Error(w, "unexpected response received from API", http.StatusInternalServerError)
+		log.Println(err)
+		return nil
+	}
+
+	var projectList []string
+	for _, item := range resJSON["items"].([]interface{}) {
+		projectList = append(projectList, item.(map[string]interface{})["metadata"].(map[string]interface{})["name"].(string))
+	}
+
+	return projectList
+}
+
 func callGRPCLoad(w http.ResponseWriter, podInterface oc.PodInterface, request LoadRequest) *docker.ImagesList {
 	conn, err := makeGRPCConnection(w, podInterface)
 	if err != nil {
@@ -164,6 +231,14 @@ func makeGRPCConnection(w http.ResponseWriter, podInterface oc.PodInterface) (*g
 	return conn, err
 }
 
+func sendProjectsResponse(w http.ResponseWriter, projectList []string) {
+	projectsResponse := ProjectsResponse{
+		ProjectList: projectList,
+	}
+
+	sendJSONResponse(w, projectsResponse)
+}
+
 func sendLoadResponse(w http.ResponseWriter, podInterface oc.PodInterface, imageList *docker.ImagesList) {
 	podBytes, err := json.Marshal(podInterface)
 	if err != nil {
@@ -189,6 +264,20 @@ func deployPod(w http.ResponseWriter) (oc.PodInterface, error) {
 	}
 	log.Println(podInterface)
 	return podInterface, nil
+}
+
+func getProjectsRequest(w http.ResponseWriter, r *http.Request, request *ProjectsRequest) bool {
+	err := getRequest(w, r, request, "projects")
+	if err != nil {
+		return false
+	}
+	log.Println(request)
+
+	if valid := isValidProjectsRequest(*request); !valid {
+		http.Error(w, "missing projects request params", http.StatusBadRequest)
+		return false
+	}
+	return true
 }
 
 func getLoadRequest(w http.ResponseWriter, r *http.Request, request *LoadRequest) bool {
@@ -217,6 +306,10 @@ func getPushRequest(w http.ResponseWriter, r *http.Request, request *PushRequest
 		return false
 	}
 	return true
+}
+
+func isValidProjectsRequest(request ProjectsRequest) bool {
+	return request.APIEndpoint != "" && request.Token != ""
 }
 
 func isValidLoadRequest(request LoadRequest) bool {

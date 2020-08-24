@@ -14,42 +14,38 @@ window.addEventListener('load', () => {
 
         // prepare API request for user's projects
         let xhr = new XMLHttpRequest()
-        xhr.open('GET', window.ENV.OAUTH_OPENSHIFT_ROUTE + ':8443/oapi/v1/projects')
-        xhr.setRequestHeader('Authorization', 'Bearer ' + window.USER.ACCESS_TOKEN)
-        xhr.setRequestHeader('Accept', 'application/json')
+        xhr.open('POST', window.ENV.PROJECTS_REQUEST_ROUTE)
 
         // API response callback
         xhr.onreadystatechange = function () {
             if (xhr.readyState == XMLHttpRequest.DONE) {
-                projectList = JSON.parse(xhr.responseText)
-
-                // map a list of user's projects
-                window.USER.PROJECT_LIST = projectList['items'].map(function (project) {
-                    return project['metadata']['name']
-                })
+                if (xhr.status == 200) {
+                    window.USER.PROJECT_LIST = JSON.parse(xhr.responseText)["ProjectList"]
+                }
+                else {
+                    console.log("Could not get user's projects")
+                }
             }
         }
 
-        xhr.send()
+        xhr.send(JSON.stringify({
+            APIEndpoint: window.ENV.OPENSHIFT_API_ENDPOINT,
+            Token: window.USER.ACCESS_TOKEN
+        }))
     }
 
     // redirect to authentication screen if access token is not present
     else {
-        let redirectUrl = window.ENV.OAUTH_OPENSHIFT_ROUTE + ':8443/login?then=' + encodeURIComponent('/oauth/authorize?')
+        let redirectUrl = window.ENV.OPENSHIFT_OAUTH_ENDPOINT + '/oauth/authorize?'
 
         // parameters passed to OpenShift OAuth server
-        let redirectParams = {
+        let redirectParams = new URLSearchParams({
             client_id: window.ENV.OAUTH_CLIENT_ID,
             redirect_uri: window.location.origin,
             response_type: 'token'
-        }
+        })
 
-        // encode entire queries, including '=' and '&'
-        for (let param in redirectParams) {
-            redirectUrl += encodeURIComponent(param + "=" + redirectParams[param] + '&')
-        }
-
-        // redirect to OAuth server (remove trailing ampersand)
-        window.location.replace(redirectUrl.slice(0, -3))
+        // redirect to OAuth server
+        window.location.replace(redirectUrl + redirectParams.toString())
     }
 })
