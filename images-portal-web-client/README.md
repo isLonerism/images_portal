@@ -23,12 +23,6 @@ Interface for users to use to upload their images.
 * PROJECTS_REQUEST_ROUTE: gRPC route to proxy the projects request through
 * OAUTH_CLIENT_ID: client ID of the created OAuthClient object
 
-### Other
-
-#### Required
-
-* Change the "fsGroup" value in pod "securityContext" field to a legal value (e.g. 5555) to let the pod resolve the config.js file at start
-
 ## Procedure
 
 1. Build and push the image from provided Dockerfile
