@@ -12,6 +12,8 @@ RUN npm run build
 # production environment
 FROM nginx:1.16.0-alpine
 COPY --from=build /app/build /usr/share/nginx/html
+RUN chgrp -R 0 /usr/share/nginx/html && \
+    chmod -R g=u /usr/share/nginx/html
 COPY run.sh /tmp
 COPY ca-certificates-20190108-r0.apk /tmp/ca-certificates-20190108-r0.apk
 RUN sed -i s/"listen .*80"/"listen 3200"/ /etc/nginx/conf.d/default.conf \
