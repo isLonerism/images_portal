@@ -21,6 +21,8 @@ spec:
             value: "tcp://localhost:2375" # docker daemon
           - name: DOCKER_API_VERSION
             value: "1.24"                 # match server API version
+          - name: DELETE_OBJECT_AFTER_LOAD
+            value: "true"
         securityContext: 
             privileged: true              # docker-in-docker must run as a privileged container
         volumeMounts: 
